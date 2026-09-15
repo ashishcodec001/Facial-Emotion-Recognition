@@ -1,0 +1,9 @@
+.venv
+__pycache__
+*.pyc
+.git
+.gitignore
+images
+captured_images
+predicted_images
+models/onnx/*.onnx
