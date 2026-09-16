@@ -272,6 +272,75 @@ button[onclick="capturePredict()"]::first-letter{
     display:none;
 }
 
+
+/* ---------- Processing overlay ---------- */
+
+.processing-overlay{
+    position:fixed;
+    inset:0;
+    z-index:9999;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    background:rgba(4,5,7,.82);
+    backdrop-filter:blur(12px);
+    -webkit-backdrop-filter:blur(12px);
+}
+
+.processing-overlay.active{
+    display:flex;
+}
+
+.processing-box{
+    width:min(380px,100%);
+    padding:30px 26px;
+    text-align:center;
+    background:linear-gradient(145deg,rgba(28,30,37,.97),rgba(14,15,19,.97));
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:22px;
+    box-shadow:0 30px 100px rgba(0,0,0,.6);
+}
+
+.processing-spinner{
+    width:46px;
+    height:46px;
+    margin:0 auto 18px;
+    border:3px solid rgba(255,255,255,.13);
+    border-top-color:#8b5cf6;
+    border-right-color:#06b6d4;
+    border-radius:50%;
+    animation:processing-spin .8s linear infinite;
+}
+
+@keyframes processing-spin{
+    to{transform:rotate(360deg)}
+}
+
+.processing-box h3{
+    margin:0 0 7px;
+    color:#fff;
+    font-size:1.1rem;
+}
+
+.processing-box p{
+    margin:0;
+    color:#a0a2aa;
+    font-size:.88rem;
+}
+
+.processing-box .processing-sub{
+    margin-top:12px;
+    color:#737680;
+    font-size:.76rem;
+}
+
+/* Keep capture button visually disabled while prediction is running */
+button.processing-disabled{
+    opacity:.55;
+    pointer-events:none;
+}
+
 @media(max-width:700px){
     body>h1,
     body>.card,
@@ -322,6 +391,15 @@ button[onclick="capturePredict()"]::first-letter{
 </head>
 
 <body>
+<div id="processingOverlay" class="processing-overlay" aria-live="polite" aria-busy="true">
+    <div class="processing-box">
+        <div class="processing-spinner"></div>
+        <h3 id="processingTitle">Analyzing your image...</h3>
+        <p id="processingMessage">Capturing and predicting the facial expression.</p>
+        <p class="processing-sub">Please wait — your result will appear automatically.</p>
+    </div>
+</div>
+
 
 <h1>Facial Expression Recognition</h1>
 
@@ -382,6 +460,13 @@ async function processUpload() {
 
     if (file.type.startsWith("image/")) {
         status.textContent = "Processing image...";
+        const overlay = document.getElementById("processingOverlay");
+        const title = document.getElementById("processingTitle");
+        const message = document.getElementById("processingMessage");
+
+        title.textContent = "Analyzing your image...";
+        message.textContent = "Running facial detection and emotion prediction.";
+        overlay.classList.add("active");
 
         try {
             await sendImage(file, "upload");
@@ -389,6 +474,8 @@ async function processUpload() {
         } catch (error) {
             status.textContent = "";
             alert(error.message);
+        } finally {
+            overlay.classList.remove("active");
         }
 
         return;
@@ -396,6 +483,14 @@ async function processUpload() {
 
     if (file.type.startsWith("video/")) {
         status.textContent = "Processing video... Please wait.";
+
+        const overlay = document.getElementById("processingOverlay");
+        const title = document.getElementById("processingTitle");
+        const message = document.getElementById("processingMessage");
+
+        title.textContent = "Processing video...";
+        message.textContent = "Analyzing selected frames and creating the result.";
+        overlay.classList.add("active");
 
         const form = new FormData();
         form.append("file", file);
@@ -423,6 +518,8 @@ async function processUpload() {
         } catch (error) {
             status.textContent = "";
             alert(error.message);
+        } finally {
+            overlay.classList.remove("active");
         }
 
         return;
@@ -451,26 +548,39 @@ async function sendImage(blob, source) {
     }
 
     showResults(data);
+    return data;
 }
 
 
 function showResults(data) {
     const results = document.getElementById("results");
     const video = document.getElementById("videoResult");
+    const preview = document.getElementById("preview");
 
     video.style.display = "none";
 
-    if (!data.faces.length) {
-        results.innerHTML = "<p>No face detected.</p>";
+    // Show the server-generated prediction image only after
+    // face detection + emotion inference has completed.
+    if (data.predicted_url) {
+        preview.src = data.predicted_url;
+        preview.style.display = "block";
+    } else if (data.predicted_filename) {
+        preview.src = "/predicted_images/" + encodeURIComponent(data.predicted_filename);
+        preview.style.display = "block";
+    } else if (data.filename) {
+        preview.src = "/predicted_images/" + encodeURIComponent(data.filename);
+        preview.style.display = "block";
+    }
+
+    if (!data.faces || !data.faces.length) {
+        results.innerHTML = "<p class=\"result\">No face detected.</p>";
         return;
     }
 
     results.innerHTML = data.faces.map((face, i) =>
         `<div class="result">
-            <b>Face ${i + 1}</b>:
-            ${face.expression}
-            —
-            ${(face.confidence * 100).toFixed(1)}%
+            <b>Face ${i + 1}</b>
+            <span>${face.expression} — ${(face.confidence * 100).toFixed(1)}%</span>
         </div>`
     ).join("");
 }
@@ -508,6 +618,7 @@ async function capturePredict() {
 
     const camera = document.getElementById("camera");
     const canvas = document.getElementById("canvas");
+    const captureButton = document.querySelector('button[onclick="capturePredict()"]');
 
     if (!camera.videoWidth || !camera.videoHeight) {
         alert("Camera is not ready yet. Please wait a moment.");
@@ -520,16 +631,29 @@ async function capturePredict() {
     const ctx = canvas.getContext("2d");
     ctx.drawImage(camera, 0, 0);
 
-    document.getElementById("preview").src =
-        canvas.toDataURL("image/jpeg");
+    // Do NOT display the raw captured frame.
+    // The final prediction image is shown only after the API responds.
+    const overlay = document.getElementById("processingOverlay");
+    const title = document.getElementById("processingTitle");
+    const message = document.getElementById("processingMessage");
+
+    title.textContent = "Analyzing your image...";
+    message.textContent = "Running facial detection and emotion prediction.";
+    overlay.classList.add("active");
+    captureButton.classList.add("processing-disabled");
+    captureButton.disabled = true;
 
     canvas.toBlob(async blob => {
         try {
             await sendImage(blob, "webcam");
         } catch (error) {
             alert(error.message);
+        } finally {
+            overlay.classList.remove("active");
+            captureButton.classList.remove("processing-disabled");
+            captureButton.disabled = false;
         }
-    }, "image/jpeg", 0.95);
+    }, "image/jpeg", 0.92);
 }
 
 

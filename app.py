@@ -69,8 +69,14 @@ if not MODEL_PATH.exists():
 if not CASCADE_PATH.exists():
     raise FileNotFoundError(f"Haar Cascade not found: {CASCADE_PATH}")
 
+session_options = ort.SessionOptions()
+session_options.intra_op_num_threads = 0
+session_options.inter_op_num_threads = 1
+session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+
 session = ort.InferenceSession(
     str(MODEL_PATH),
+    sess_options=session_options,
     providers=["CPUExecutionProvider"],
 )
 
