@@ -3,4 +3,6 @@ __pycache__/
 .keras/
 .ipynb_checkpoints/
 models/onnx/*.onnx
-images
+captured_images
+predicted_images
+.gitignore
