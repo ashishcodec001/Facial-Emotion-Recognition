@@ -893,12 +893,6 @@ This project demonstrates practical experience with:
 
 ---
 
-# 📜 License
-
-Add the appropriate license for your project before distributing it publicly.
-
-If this repository is intended as a personal portfolio/academic project, clearly state the usage permissions you want to provide.
-
 ---
 
 # 👨‍💻 Author
