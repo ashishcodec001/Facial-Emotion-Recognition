@@ -7,3 +7,4 @@ images
 captured_images
 predicted_images
 models/onnx/*.onnx
+test_data

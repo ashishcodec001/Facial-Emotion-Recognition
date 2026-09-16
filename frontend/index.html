@@ -218,6 +218,7 @@ button[onclick="capturePredict()"]::first-letter{
     border-radius:16px;
     background:#050506;
     box-shadow:0 18px 50px rgba(0,0,0,.42);
+    transform:none;
 }
 
 #canvas{display:none}
@@ -629,7 +630,13 @@ async function capturePredict() {
     canvas.height = camera.videoHeight;
 
     const ctx = canvas.getContext("2d");
+
+    // Capture the webcam frame in its natural (non-mirrored) orientation.
+    ctx.save();
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
     ctx.drawImage(camera, 0, 0);
+    ctx.restore();
 
     // Do NOT display the raw captured frame.
     // The final prediction image is shown only after the API responds.
