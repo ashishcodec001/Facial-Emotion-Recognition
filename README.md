@@ -415,7 +415,7 @@ opencv-contrib-python-headless
 onnxruntime
 huggingface_hub
 imageio-ffmpeg
----
+```
 
 ---
 
